@@ -17,3 +17,6 @@ foreach ($Row in $ds.Tables[0].Rows)
         {
         write-host  "$($Row.C1)"  
         }
+
+# Close the Connection
+$cn.close()
