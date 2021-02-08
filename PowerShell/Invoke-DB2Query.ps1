@@ -19,6 +19,9 @@ function Invoke-DB2Query
         .PARAMETER Query
             Specify the Query to run against the database.
 
+        .PARAMETER OutputAs
+            Specify the results of the query (or queries) should be returned.  The options are DataTables, DataSet, or Text.
+
         .EXAMPLE
         Invoke-DB2Query -Server '' -dbName ''  -Query "SELECT *
           FROM syscat.tables
@@ -27,10 +30,36 @@ function Invoke-DB2Query
 
         Description
         -----------
-        Establishes a connection to the server & database specified, then runs the query specified.  The results are retuend formatted.
+        Establishes a connection to the server & database specified, then runs the query specified.  The results are retuend as a DataTable (un-formatted).
 
         .EXAMPLE
-        Invoke-DB2Query -Server '' -dbName '' -Query "SELECT *
+        Invoke-DB2Query -Server '' -dbName '' -OutputAs DataTables -Query "SELECT *
+          FROM syscat.tables
+         ORDER BY TABNAME ASC
+         FETCH FIRST 10 ROWS;"
+
+        Description
+        -----------
+        Establishes a connection to the server & database specified, then runs two queries.  The results are retuend as a collection of DataTables (un-formatted).
+
+        .EXAMPLE
+        $Results = Invoke-DB2Query -Server '' -dbName '' -OutputAs DataTables -Query "SELECT *
+          FROM syscat.tables
+         ORDER BY TABNAME ASC
+         FETCH FIRST 10 ROWS;
+         
+         SELECT *
+          FROM syscat.tables
+         ORDER BY TABNAME DESC
+         FETCH FIRST 10 ROWS;"
+
+        Description
+        -----------
+        Establishes a connection to the server & database specified, then runs two queries.  The results are retuend as a collection of DataTables (un-formatted).
+        The resulting DataTables can be accessed separatly $Results[0], $Results[1].
+
+        .EXAMPLE
+        Invoke-DB2Query -Server '' -dbName '' -OutputAs Text -Query "SELECT *
           FROM syscat.tables
          ORDER BY TABNAME ASC
          FETCH FIRST 10 ROWS;
@@ -43,6 +72,21 @@ function Invoke-DB2Query
         Description
         -----------
         Establishes a connection to the server & database specified, then runs two queries.  The results are retuend formatted separately.
+
+        .EXAMPLE
+        Invoke-DB2Query -Server '' -dbName '' -OutputAs DataSet -Query "SELECT *
+          FROM syscat.tables
+         ORDER BY TABNAME ASC
+         FETCH FIRST 10 ROWS;
+         
+         SELECT *
+          FROM syscat.tables
+         ORDER BY TABNAME DESC
+         FETCH FIRST 10 ROWS;"
+
+        Description
+        -----------
+        Establishes a connection to the server & database specified, then runs two queries.  The results are retuend as a single DataSet object.
     #>
 
     [CmdletBinding()]
@@ -57,7 +101,11 @@ function Invoke-DB2Query
     $port,
 
     [parameter(Mandatory=$true)]
-    [string] $Query
+    [string] $Query,
+    
+    [Parameter(Mandatory = $false, ValueFromPipelineByPropertyName = $true)]
+    [ValidateSet("DataTables","DataSet","Text")]
+    $OutputAs
     )
 
 #Define connection string for the database
@@ -65,16 +113,27 @@ $cn = new-object system.data.OleDb.OleDbConnection("server=$($server);Provider=I
 #Define data set for first query
 $ds = new-object "System.Data.DataSet" "ds"
 #Define query to run
-$Query
+#$Query
 # Define data object given the specific query and connection string
 $da = new-object "System.Data.OleDb.OleDbDataAdapter" ($Query, $cn)
 # Fill the data set - essentially run the query. 
 $da.Fill($ds) | Out-Null
 # Print the result
-foreach ($Table in $ds.Tables)
+Switch($OutputAs)
+{
+    'DataSet'{
+        Write-Output @(,$ds)
+    }
+    'DataTables'{
+        Write-Output @(,$ds.Tables)
+    }
+    'Text'{foreach ($Table in $ds.Tables)
         {
-        $Table.Rows | Format-Table -AutoSize
+        $Table.Rows | Format-Table
         }
+    }
+}
+
 
 # Close the Connection
 $cn.close()
